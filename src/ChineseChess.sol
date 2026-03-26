@@ -354,6 +354,9 @@ contract ChineseChess {
 
     function _isCheckmate(Piece[90] storage board, Color color) internal returns (bool) {
         if (!_isKingInCheck(board, color)) return false;
+        // Only check pieces of the defending color (max 16 pieces)
+        // For each piece, try all reachable squares (max 90)
+        // This reduces worst case from 90*90=8100 to 16*90=1440 checks
         for (uint8 fr = 0; fr < ROWS; fr++) {
             for (uint8 fc = 0; fc < COLS; fc++) {
                 (PieceType srcType, Color srcColor) = _getPiece(board, fr, fc);
@@ -361,20 +364,18 @@ contract ChineseChess {
                 for (uint8 tr = 0; tr < ROWS; tr++) {
                     for (uint8 tc = 0; tc < COLS; tc++) {
                         if (fc == tc && fr == tr) continue;
-                        (, Color dstColor) = _getPiece(board, tr, tc);
+                        (PieceType dstType, Color dstColor) = _getPiece(board, tr, tc);
                         if (dstColor == color) continue;
-                        (PieceType dstType,) = _getPiece(board, tr, tc);
                         if (dstType == PieceType.King) continue;
-                        if (_isValidMove(board, fc, fr, tc, tr, srcType, color)) {
-                            // Simulate move
-                            _setPiece(board, tr, tc, srcType, color);
-                            _setPiece(board, fr, fc, PieceType.Empty, Color.None);
-                            bool stillInCheck = _isKingInCheck(board, color);
-                            // Restore
-                            _setPiece(board, fr, fc, srcType, color);
-                            _setPiece(board, tr, tc, dstType, dstColor);
-                            if (!stillInCheck) return false;
-                        }
+                        if (!_isValidMove(board, fc, fr, tc, tr, srcType, color)) continue;
+                        // Simulate move on storage
+                        _setPiece(board, tr, tc, srcType, color);
+                        _setPiece(board, fr, fc, PieceType.Empty, Color.None);
+                        bool stillInCheck = _isKingInCheck(board, color);
+                        // Restore
+                        _setPiece(board, fr, fc, srcType, color);
+                        _setPiece(board, tr, tc, dstType, dstColor);
+                        if (!stillInCheck) return false;
                     }
                 }
             }
